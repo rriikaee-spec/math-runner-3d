@@ -1,0 +1,2146 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>MATH RUNNER: The Ultimate Math Adventure</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            box-sizing: border-box;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: none;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: #0f172a;
+        }
+        .font-arcade {
+            font-family: 'Fredoka', cursive, sans-serif;
+        }
+        #game-canvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+        }
+        .ui-layer {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            pointer-events: none;
+        }
+        .pointer-auto {
+            pointer-events: auto;
+        }
+        /* Arcade Button Styles */
+        .btn-arcade {
+            transition: all 0.15s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 6px 0 rgba(0, 0, 0, 0.35), 0 10px 20px rgba(0, 0, 0, 0.25);
+        }
+        .btn-arcade:active {
+            transform: translateY(4px);
+            box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35), 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        /* Custom Scrollbar for Modals */
+        .custom-scroll {
+            touch-action: pan-y;
+            overflow-y: auto;
+        }
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+        }
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.25);
+            border-radius: 10px;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { transform: scale(1); filter: drop-shadow(0 0 12px rgba(250, 204, 21, 0.6)); }
+            50% { transform: scale(1.04); filter: drop-shadow(0 0 22px rgba(250, 204, 21, 0.9)); }
+        }
+        .title-glow {
+            animation: pulseGlow 2.5s infinite ease-in-out;
+        }
+        @keyframes slideDown {
+            from { opacity: 0; transform: translate(-50%, -25px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+        .question-banner {
+            animation: slideDown 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        @keyframes floatToast {
+            0% { opacity: 0; transform: translateY(15px) scale(0.9); }
+            15% { opacity: 1; transform: translateY(0) scale(1); }
+            85% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-15px) scale(0.95); }
+        }
+        .toast-anim {
+            animation: floatToast 3.2s forwards ease-in-out;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Three.js Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- HUD DURING GAMEPLAY -->
+    <div id="hud" class="ui-layer hidden flex flex-col justify-between p-3 sm:p-5">
+        <!-- Top Bar -->
+        <div class="flex items-start justify-between gap-2 w-full max-w-5xl mx-auto">
+            <!-- Left: Lives & Level Progress -->
+            <div class="flex flex-col gap-2">
+                <div class="flex items-center gap-2 bg-slate-900/80 backdrop-blur-md border border-white/15 px-3 py-1.5 rounded-2xl shadow-lg">
+                    <div id="hud-hearts" class="flex items-center gap-1 text-lg sm:text-xl">❤️❤️❤️</div>
+                    <div class="h-4 w-[1px] bg-white/20 mx-1"></div>
+                    <span id="hud-level-badge" class="text-xs sm:text-sm font-bold text-amber-400 tracking-wide">LV 1</span>
+                </div>
+                <!-- Target Progress Bar -->
+                <div class="bg-slate-900/80 backdrop-blur-md border border-white/15 p-2 rounded-2xl w-40 sm:w-52 shadow-lg">
+                    <div class="flex justify-between text-[11px] font-bold text-slate-300 mb-1">
+                        <span>Target Level</span>
+                        <span id="hud-target-text" class="text-emerald-400">0 / 500</span>
+                    </div>
+                    <div class="w-full h-2.5 bg-slate-800 rounded-full overflow-hidden">
+                        <div id="hud-target-bar" class="h-full bg-gradient-to-r from-emerald-400 to-teal-300 transition-all duration-300" style="width: 0%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center: Math Question Banner -->
+            <div id="math-question-box" class="hidden question-banner pointer-auto fixed top-20 sm:top-5 left-1/2 -translate-x-1/2 z-20 w-[92%] max-w-md bg-gradient-to-b from-indigo-600 to-blue-700 border-2 border-amber-300 rounded-3xl px-4 py-3 shadow-2xl text-center">
+                <div class="text-[11px] font-extrabold uppercase tracking-wider text-amber-300 mb-0.5">⚡ TANTANGAN MATEMATIKA ⚡</div>
+                <div id="math-question-text" class="font-arcade text-xl sm:text-2xl md:text-3xl font-bold text-white drop-shadow">
+                    25 × 4 = ?
+                </div>
+                <div class="text-[11px] text-blue-100 mt-1 font-medium">Pilih jalur rel dengan jawaban yang benar!</div>
+            </div>
+
+            <!-- Right: Score, Coins & Pause -->
+            <div class="flex items-center gap-2">
+                <div class="flex flex-col items-end bg-slate-900/80 backdrop-blur-md border border-white/15 px-3.5 py-1.5 rounded-2xl shadow-lg">
+                    <div class="flex items-center gap-1.5">
+                        <span id="hud-multiplier" class="hidden text-xs font-extrabold bg-amber-400 text-slate-950 px-1.5 py-0.5 rounded-md">2X</span>
+                        <span id="hud-score" class="font-arcade text-xl sm:text-2xl font-bold text-white">0</span>
+                    </div>
+                    <div class="flex items-center gap-1 text-xs sm:text-sm font-bold text-amber-400">
+                        <span>🪙</span>
+                        <span id="hud-coins">0</span>
+                    </div>
+                </div>
+                <button id="btn-pause" class="pointer-auto btn-arcade bg-slate-800/90 hover:bg-slate-700 border border-white/20 text-white w-11 h-11 sm:w-12 sm:h-12 rounded-2xl flex items-center justify-center text-xl">
+                    ⏸️
+                </button>
+            </div>
+        </div>
+
+        <!-- Active Powerups & Live Explanation Toast -->
+        <div class="flex flex-col items-center gap-2 my-auto pointer-events-none">
+            <!-- Active Powerups -->
+            <div id="active-powerups" class="flex flex-wrap justify-center gap-2"></div>
+            
+            <!-- Pembahasan Singkat (Explanation Toast) -->
+            <div id="explanation-toast" class="hidden max-w-md w-[90%] bg-slate-900/95 border-2 border-emerald-400 rounded-2xl p-3.5 shadow-2xl text-center">
+                <div id="exp-status" class="text-xs font-extrabold uppercase tracking-wider text-emerald-400 mb-1">✅ BENAR! +100 POIN</div>
+                <div id="exp-detail" class="text-sm sm:text-base font-semibold text-white">Pembahasan: 25 × 4 = 100</div>
+            </div>
+        </div>
+
+        <!-- Bottom: On-screen Controls for Desktop/Accessibility -->
+        <div class="flex items-end justify-between w-full max-w-4xl mx-auto pb-1">
+            <div class="hidden sm:block text-xs text-white/75 bg-slate-900/60 backdrop-blur px-3 py-1.5 rounded-xl border border-white/10">
+                Kontrol: <b>Swipe</b> atau <b>Arrow Keys / WASD</b>
+            </div>
+            <div class="pointer-auto flex items-center gap-2 mx-auto sm:mx-0">
+                <button id="ctrl-left" class="btn-arcade w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/25 text-white text-xl font-bold flex items-center justify-center">⬅️</button>
+                <div class="flex flex-col gap-2">
+                    <button id="ctrl-up" class="btn-arcade w-12 h-11 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/25 text-white text-lg font-bold flex items-center justify-center">⬆️</button>
+                    <button id="ctrl-down" class="btn-arcade w-12 h-11 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/25 text-white text-lg font-bold flex items-center justify-center">⬇️</button>
+                </div>
+                <button id="ctrl-right" class="btn-arcade w-12 h-12 sm:w-13 sm:h-13 rounded-2xl bg-white/15 hover:bg-white/25 backdrop-blur-md border border-white/25 text-white text-xl font-bold flex items-center justify-center">➡️</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN MENU OVERLAY -->
+    <div id="menu-main" class="ui-layer pointer-auto flex flex-col items-center justify-between p-4 sm:p-6 bg-gradient-to-b from-slate-950/60 via-slate-900/40 to-slate-950/80 backdrop-blur-[2px]">
+        <!-- Top Stats Header -->
+        <div class="w-full max-w-4xl flex items-center justify-between">
+            <div class="flex items-center gap-2 bg-slate-900/85 border border-white/15 px-4 py-2 rounded-2xl shadow-lg">
+                <span class="text-xl">🪙</span>
+                <span id="menu-total-coins" class="font-arcade text-lg sm:text-xl font-bold text-amber-400">0</span>
+            </div>
+            <div class="flex items-center gap-2">
+                <div class="bg-slate-900/85 border border-white/15 px-3.5 py-2 rounded-2xl text-xs sm:text-sm font-bold text-slate-200 shadow-lg">
+                    🏆 Rekor: <span id="menu-high-score" class="text-amber-400 font-arcade text-base">0</span>
+                </div>
+                <button id="btn-sound-toggle" class="btn-arcade bg-slate-900/85 border border-white/15 w-11 h-11 rounded-2xl flex items-center justify-center text-xl text-white">
+                    🔊
+                </button>
+            </div>
+        </div>
+
+        <!-- Center Title & Primary Play -->
+        <div class="flex flex-col items-center text-center my-auto max-w-lg">
+            <div class="inline-block bg-amber-400 text-slate-950 text-xs font-extrabold px-3 py-1 rounded-full uppercase tracking-widest mb-3 shadow-md">
+                3D Educational Endless Runner (500 Levels)
+            </div>
+            <h1 class="font-arcade text-4xl sm:text-6xl font-extrabold text-transparent bg-clip-text bg-gradient-to-b from-amber-300 via-orange-400 to-rose-500 title-glow leading-tight">
+                MATH RUNNER
+            </h1>
+            <p class="font-arcade text-lg sm:text-2xl font-semibold text-white tracking-wide mt-1 drop-shadow">
+                The Ultimate Math Adventure
+            </p>
+            <p class="text-xs sm:text-sm text-slate-200/90 mt-3 max-w-md bg-slate-900/60 px-4 py-2 rounded-2xl border border-white/10">
+                Berlari di jalur kereta, hindari rintangan, kumpulkan power-up, dan taklukkan 500 level matematika!
+            </p>
+
+            <!-- Selected Level Quick Play -->
+            <div class="mt-6 flex flex-col sm:flex-row items-center gap-3 w-full justify-center">
+                <button id="btn-play-now" class="btn-arcade w-full sm:w-auto px-8 py-4 rounded-3xl bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-arcade text-xl sm:text-2xl font-bold flex items-center justify-center gap-2 border-2 border-emerald-200">
+                    <span>▶️ MAIN LEVEL <span id="selected-level-num">1</span></span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Bottom Navigation Grid -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 w-full max-w-3xl">
+            <button id="nav-levels" class="btn-arcade bg-indigo-600/90 hover:bg-indigo-500 border border-indigo-300/30 p-3 rounded-2xl text-white flex flex-col items-center justify-center gap-1">
+                <span class="text-2xl">🗺️</span>
+                <span class="text-xs sm:text-sm font-bold">500 Level</span>
+            </button>
+            <button id="nav-shop" class="btn-arcade bg-amber-500/90 hover:bg-amber-400 border border-amber-200/40 p-3 rounded-2xl text-slate-950 flex flex-col items-center justify-center gap-1">
+                <span class="text-2xl">👟</span>
+                <span class="text-xs sm:text-sm font-extrabold">Karakter & Kostum</span>
+            </button>
+            <button id="nav-stats" class="btn-arcade bg-sky-600/90 hover:bg-sky-500 border border-sky-300/30 p-3 rounded-2xl text-white flex flex-col items-center justify-center gap-1">
+                <span class="text-2xl">📊</span>
+                <span class="text-xs sm:text-sm font-bold">Rapor Edukasi</span>
+            </button>
+            <button id="nav-leaderboard" class="btn-arcade bg-purple-600/90 hover:bg-purple-500 border border-purple-300/30 p-3 rounded-2xl text-white flex flex-col items-center justify-center gap-1">
+                <span class="text-2xl">🏆</span>
+                <span class="text-xs sm:text-sm font-bold">Peringkat</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MODAL: LEVEL SELECTOR (500 LEVELS) -->
+    <div id="modal-levels" class="ui-layer pointer-auto hidden bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-white/15 rounded-3xl w-full max-w-4xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between bg-slate-800/60">
+                <div>
+                    <h2 class="font-arcade text-xl sm:text-2xl font-bold text-white">🗺️ PILIH LEVEL (1 - 500)</h2>
+                    <p class="text-xs text-slate-300">Pilih level atau gulir untuk menjelajahi 500 tingkat tantangan!</p>
+                </div>
+                <button class="close-modal btn-arcade bg-rose-500 text-white w-10 h-10 rounded-xl font-bold text-lg">✕</button>
+            </div>
+            <!-- Quick Tier Jump Filter -->
+            <div class="flex items-center gap-2 px-4 py-2.5 bg-slate-950/50 border-b border-white/10 overflow-x-auto">
+                <button onclick="filterLevelTier('all')" class="px-3 py-1.5 rounded-xl bg-indigo-600 text-white text-xs font-bold whitespace-nowrap">Semua</button>
+                <button onclick="filterLevelTier('Beginner')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-emerald-400 text-xs font-bold whitespace-nowrap">Beginner (1-100)</button>
+                <button onclick="filterLevelTier('Intermediate')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-sky-400 text-xs font-bold whitespace-nowrap">Intermediate (101-200)</button>
+                <button onclick="filterLevelTier('Advanced')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 text-xs font-bold whitespace-nowrap">Advanced (201-350)</button>
+                <button onclick="filterLevelTier('Master')" class="px-3 py-1.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-rose-400 text-xs font-bold whitespace-nowrap">Math Master (351-500)</button>
+            </div>
+            <div id="levels-container" class="p-4 sm:p-5 custom-scroll space-y-4">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: CHARACTER & COSTUME SHOP -->
+    <div id="modal-shop" class="ui-layer pointer-auto hidden bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-white/15 rounded-3xl w-full max-w-3xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between bg-slate-800/60">
+                <div class="flex items-center gap-3">
+                    <h2 class="font-arcade text-xl sm:text-2xl font-bold text-white">👟 KARAKTER & KOSTUM</h2>
+                    <span class="bg-amber-400/20 border border-amber-400 text-amber-300 px-3 py-1 rounded-full text-xs font-extrabold">🪙 <span id="shop-coins">0</span></span>
+                </div>
+                <button class="close-modal btn-arcade bg-rose-500 text-white w-10 h-10 rounded-xl font-bold text-lg">✕</button>
+            </div>
+            <div id="shop-container" class="p-4 sm:p-5 custom-scroll grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: EDUCATION REPORT / RAPOR BELAJAR -->
+    <div id="modal-stats" class="ui-layer pointer-auto hidden bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-white/15 rounded-3xl w-full max-w-3xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between bg-slate-800/60">
+                <div>
+                    <h2 class="font-arcade text-xl sm:text-2xl font-bold text-white">📊 ANALISIS & RAPOR MATEMATIKA</h2>
+                    <p class="text-xs text-slate-300">Pantau perkembangan kemampuan berhitungmu secara real-time</p>
+                </div>
+                <button class="close-modal btn-arcade bg-rose-500 text-white w-10 h-10 rounded-xl font-bold text-lg">✕</button>
+            </div>
+            <div id="stats-container" class="p-4 sm:p-5 custom-scroll space-y-5">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: LEADERBOARD -->
+    <div id="modal-leaderboard" class="ui-layer pointer-auto hidden bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-white/15 rounded-3xl w-full max-w-xl max-h-[88vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="p-4 sm:p-5 border-b border-white/10 flex items-center justify-between bg-slate-800/60">
+                <div>
+                    <h2 class="font-arcade text-xl sm:text-2xl font-bold text-white">🏆 PAPAN PERINGKAT</h2>
+                    <p class="text-xs text-slate-300">Pelari Matematika Terbaik di Kota Stasiun</p>
+                </div>
+                <button class="close-modal btn-arcade bg-rose-500 text-white w-10 h-10 rounded-xl font-bold text-lg">✕</button>
+            </div>
+            <div id="leaderboard-container" class="p-4 sm:p-5 custom-scroll space-y-2.5">
+                <!-- Populated by JS -->
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL: PAUSE / GAME OVER / LEVEL COMPLETE -->
+    <div id="modal-endgame" class="ui-layer pointer-auto hidden bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4">
+        <div class="bg-slate-900 border-2 border-white/15 rounded-3xl w-full max-w-md p-6 text-center shadow-2xl">
+            <div id="endgame-emoji" class="text-5xl mb-2">🎉</div>
+            <h2 id="endgame-title" class="font-arcade text-3xl font-bold text-white">LEVEL SELESAI!</h2>
+            <p id="endgame-subtitle" class="text-sm text-slate-300 mt-1">Hebat! Kamu menaklukkan tantangan matematika!</p>
+
+            <div class="bg-slate-800/80 border border-white/10 rounded-2xl p-4 my-5 space-y-2.5 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Skor Akhir</span>
+                    <span id="end-score" class="font-arcade text-lg font-bold text-white">0</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Koin Didapat</span>
+                    <span id="end-coins" class="font-bold text-amber-400">+0 🪙</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Jawaban Benar</span>
+                    <span id="end-correct" class="font-bold text-emerald-400">0 Soal</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">Jawaban Salah</span>
+                    <span id="end-wrong" class="font-bold text-rose-400">0 Soal</span>
+                </div>
+            </div>
+
+            <!-- Last explanation review if failed -->
+            <div id="end-last-review" class="hidden bg-indigo-950/70 border border-indigo-400/30 rounded-2xl p-3 mb-5 text-left text-xs text-indigo-100">
+            </div>
+
+            <div class="flex flex-col gap-2.5">
+                <button id="btn-end-primary" class="btn-arcade w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-500 text-slate-950 font-arcade text-lg font-bold">
+                    LANJUT LEVEL BERIKUTNYA ▶️
+                </button>
+                <button id="btn-end-retry" class="btn-arcade w-full py-3 rounded-2xl bg-amber-500 text-slate-950 font-bold text-sm">
+                    🔄 MAIN ULANG LEVEL INI
+                </button>
+                <button id="btn-end-home" class="btn-arcade w-full py-3 rounded-2xl bg-slate-800 text-white font-bold text-sm border border-white/10">
+                    🏠 KEMBALI KE MENU UTAMA
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- PAUSE MODAL -->
+    <div id="modal-pause" class="ui-layer pointer-auto hidden bg-slate-950/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-slate-900 border border-white/15 rounded-3xl w-full max-w-sm p-6 text-center shadow-2xl">
+            <h2 class="font-arcade text-3xl font-bold text-white mb-2">⏸️ JEDA</h2>
+            <p class="text-xs text-slate-300 mb-6">Tarik napas sejenak sebelum melanjutkan lari!</p>
+            <div class="flex flex-col gap-3">
+                <button id="btn-resume" class="btn-arcade w-full py-3.5 rounded-2xl bg-emerald-500 text-slate-950 font-arcade text-lg font-bold">
+                    ▶️ LANJUTKAN
+                </button>
+                <button id="btn-pause-restart" class="btn-arcade w-full py-3 rounded-2xl bg-amber-500 text-slate-950 font-bold text-sm">
+                    🔄 ULANGI LEVEL
+                </button>
+                <button id="btn-pause-home" class="btn-arcade w-full py-3 rounded-2xl bg-slate-800 text-white font-bold text-sm border border-white/10">
+                    🏠 MENU UTAMA
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+    /**
+     * ============================================================================
+     * 1. WEB AUDIO SYNTHESIZER (NO EXTERNAL SOUND FILES REQUIRED)
+     * ============================================================================
+     */
+    class SoundFX {
+        constructor() {
+            this.enabled = true;
+            this.ctx = null;
+        }
+        init() {
+            if (!this.ctx) {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (AudioCtx) this.ctx = new AudioCtx();
+            }
+            if (this.ctx && this.ctx.state === 'suspended') {
+                this.ctx.resume();
+            }
+        }
+        playTone(freq, type, duration, vol = 0.15, slideFreq = null) {
+            if (!this.enabled) return;
+            this.init();
+            if (!this.ctx) return;
+
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = type;
+            osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+            if (slideFreq) {
+                osc.frequency.exponentialRampToValueAtTime(slideFreq, this.ctx.currentTime + duration);
+            }
+            gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start();
+            osc.stop(this.ctx.currentTime + duration);
+        }
+        swipe() { this.playTone(260, 'sine', 0.12, 0.12, 480); }
+        jump() { this.playTone(300, 'triangle', 0.22, 0.16, 650); }
+        roll() { this.playTone(240, 'sine', 0.18, 0.14, 110); }
+        coin() {
+            this.playTone(987.77, 'sine', 0.08, 0.12);
+            setTimeout(() => this.playTone(1318.51, 'sine', 0.16, 0.12), 65);
+        }
+        powerup() {
+            [440, 554, 659, 880].forEach((f, i) => {
+                setTimeout(() => this.playTone(f, 'triangle', 0.14, 0.14), i * 55);
+            });
+        }
+        correct() {
+            [523.25, 659.25, 783.99, 1046.50].forEach((f, i) => {
+                setTimeout(() => this.playTone(f, 'sine', 0.18, 0.18), i * 70);
+            });
+        }
+        wrong() {
+            this.playTone(220, 'sawtooth', 0.22, 0.18, 130);
+            setTimeout(() => this.playTone(160, 'sawtooth', 0.3, 0.18, 95), 140);
+        }
+        crash() {
+            this.playTone(120, 'sawtooth', 0.35, 0.25, 45);
+        }
+        levelWin() {
+            const notes = [523.25, 659.25, 783.99, 1046.5, 783.99, 1046.5];
+            notes.forEach((n, idx) => {
+                setTimeout(() => this.playTone(n, 'triangle', 0.22, 0.18), idx * 110);
+            });
+        }
+    }
+    const sfx = new SoundFX();
+
+    /**
+     * ============================================================================
+     * 2. 500 LEVELS GENERATOR & PROCEDURAL QUESTION BANK
+     * ============================================================================
+     */
+    function generateAllLevelConfigs() {
+        const configs = [];
+        const envs = ['day', 'sunset', 'night', 'neon', 'cyber'];
+
+        for (let i = 1; i <= 500; i++) {
+            let tier = 'Beginner';
+            let topic = 'Penjumlahan Dasar';
+            let speed = 24 + Math.floor(i / 30);
+            let target = 400 + i * 20;
+
+            if (i <= 100) {
+                tier = 'Beginner';
+                if (i <= 25) topic = 'Penjumlahan Sederhana';
+                else if (i <= 50) topic = 'Pengurangan Sederhana';
+                else if (i <= 75) topic = 'Perkalian Dasar';
+                else topic = 'Pembagian Dasar & Campuran';
+            } else if (i <= 200) {
+                tier = 'Intermediate';
+                if (i <= 125) topic = 'Perkalian Dua Angka';
+                else if (i <= 150) topic = 'Pembagian Angka Besar';
+                else if (i <= 175) topic = 'Tambah & Kali';
+                else topic = 'Operasi Campuran 4 Dasar';
+            } else if (i <= 350) {
+                tier = 'Advanced';
+                if (i <= 245) topic = 'Bilangan Ratusan';
+                else if (i <= 280) topic = 'Kali & Bagi Kompleks';
+                else if (i <= 315) topic = 'Hitung Tiga Langkah';
+                else topic = 'Operasi Tanda Kurung & Cerita';
+            } else {
+                tier = 'Math Master';
+                if (i <= 390) topic = 'Campuran Tingkat Tinggi';
+                else if (i <= 430) topic = 'Kalkulasi Ribuan';
+                else if (i <= 470) topic = 'Logika & Pola Angka';
+                else topic = 'Final Math Challenge Master';
+            }
+
+            const env = envs[Math.floor((i - 1) / 100) % envs.length];
+            configs.push({
+                id: i,
+                tier: tier === 'Math Master' && i > 450 ? 'Grandmaster' : tier,
+                title: `Level ${i}: ${topic}`,
+                topic: topic,
+                target: Math.min(6000, target),
+                speed: Math.min(46, speed),
+                env: env
+            });
+        }
+        return configs;
+    }
+
+    const LEVEL_CONFIGS = generateAllLevelConfigs();
+
+    class QuestionBankManager {
+        constructor() {
+            this.banks = {};
+        }
+
+        makeChoices(correct) {
+            const set = new Set([correct]);
+            const offsets = [-15, -10, -8, -5, -4, -3, -2, -1, 1, 2, 3, 4, 5, 8, 10, 15, 25, -25];
+            let guard = 0;
+            while (set.size < 3 && guard < 100) {
+                guard++;
+                const off = offsets[Math.floor(Math.random() * offsets.length)];
+                const candidate = correct + off;
+                if (candidate >= 0 && candidate !== correct) {
+                    set.add(candidate);
+                }
+            }
+            while (set.size < 3) {
+                set.add(correct + set.size * 9);
+            }
+            return Array.from(set).sort(() => Math.random() - 0.5);
+        }
+
+        getQuestionsForLevel(levelId) {
+            if (this.banks[levelId]) return this.banks[levelId];
+            
+            const list = [];
+            const seedOffset = levelId * 17;
+
+            for (let qIdx = 0; qIdx < 25; qIdx++) {
+                let a, b, c, d, ans, q, exp;
+                const m = (seedOffset + qIdx) % 10;
+
+                if (levelId <= 100) {
+                    // Beginner
+                    a = 5 + ((seedOffset + qIdx * 3) % 40);
+                    b = 3 + ((seedOffset + qIdx * 7) % 30);
+                    if (levelId <= 25) {
+                        ans = a + b;
+                        q = `${a} + ${b} = ?`;
+                        exp = `${a} ditambah ${b} = ${ans}.`;
+                    } else if (levelId <= 50) {
+                        const big = a + b + 10;
+                        ans = a;
+                        q = `${big} - ${b} = ?`;
+                        exp = `${big} dikurangi ${b} = ${ans}.`;
+                    } else if (levelId <= 75) {
+                        a = 2 + (qIdx % 9);
+                        b = 2 + ((qIdx * 2) % 8);
+                        ans = a * b;
+                        q = `${a} × ${b} = ?`;
+                        exp = `${a} dikali ${b} = ${ans}.`;
+                    } else {
+                        b = 2 + (qIdx % 7);
+                        ans = 3 + (qIdx % 10);
+                        a = b * ans;
+                        q = `${a} ÷ ${b} = ?`;
+                        exp = `${a} dibagi ${b} = ${ans}.`;
+                    }
+                } else if (levelId <= 200) {
+                    // Intermediate
+                    a = 12 + (m * 4) + (qIdx % 20);
+                    b = 3 + (qIdx % 9);
+                    if (qIdx % 3 === 0) {
+                        ans = a * b;
+                        q = `${a} × ${b} = ?`;
+                        exp = `Perkalian dua angka: ${a} × ${b} = ${ans}.`;
+                    } else if (qIdx % 3 === 1) {
+                        const prod = a * b;
+                        ans = a;
+                        q = `${prod} ÷ ${b} = ?`;
+                        exp = `Pembagian: ${prod} ÷ ${b} = ${ans}.`;
+                    } else {
+                        ans = a + b * 2 - 4;
+                        q = `${a} + ${b} × 2 - 4 = ?`;
+                        exp = `Kerjakan kali dulu: ${b}×2 = ${b*2}, lalu ${a} + ${b*2} - 4 = ${ans}.`;
+                    }
+                } else if (levelId <= 350) {
+                    // Advanced
+                    a = 120 + (levelId % 50) + qIdx * 5;
+                    b = 45 + (qIdx * 7) % 80;
+                    c = 2 + (qIdx % 6);
+                    if (qIdx % 2 === 0) {
+                        ans = a + b - 15;
+                        q = `${a} + ${b} - 15 = ?`;
+                        exp = `Penjumlahan & pengurangan ratusan: ${ans}.`;
+                    } else {
+                        const p1 = 6 + (qIdx % 8);
+                        const p2 = 4 + (qIdx % 5);
+                        ans = (p1 + p2) * c;
+                        q = `(${p1} + ${p2}) × ${c} = ?`;
+                        exp = `Dalam kurung dulu: ${p1}+${p2} = ${p1+p2}, lalu kali ${c} = ${ans}.`;
+                    }
+                } else {
+                    // Math Master & Grandmaster
+                    a = 15 + (qIdx % 12);
+                    b = 8 + (qIdx % 9);
+                    c = 3 + (qIdx % 5);
+                    d = 20 + qIdx * 3;
+                    ans = ((a + b) * c) - d;
+                    q = `(${a} + ${b}) × ${c} - ${d} = ?`;
+                    exp = `Prioritas operasi: (${a}+${b})×${c} - ${d} = ${ans}.`;
+                }
+
+                list.push({
+                    q: q,
+                    answer: ans,
+                    choices: this.makeChoices(ans),
+                    explanation: exp
+                });
+            }
+
+            this.banks[levelId] = list;
+            return list;
+        }
+
+        getShuffledQuestions(levelId) {
+            const list = [...this.getQuestionsForLevel(levelId)];
+            for (let i = list.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [list[i], list[j]] = [list[j], list[i]];
+            }
+            return list;
+        }
+    }
+    const questionBank = new QuestionBankManager();
+
+    /**
+     * ============================================================================
+     * 3. CHARACTERS & PERSISTENT SAVE DATA
+     * ============================================================================
+     */
+    const CHARACTERS = [
+        { id: 'leo', name: 'Leo Skater', desc: 'Pelari kota penuh semangat dengan jaket merah ikonik.', price: 0, shirt: 0xef4444, pants: 0x1e293b, cap: 0xfacc15, skin: 0xfcd34d },
+        { id: 'maya', name: 'Maya Cyber', desc: 'Jenius matematika dengan kostum neon biru futuristik.', price: 150, shirt: 0x06b6d4, pants: 0x312e81, cap: 0xf472b6, skin: 0xfde68a },
+        { id: 'bima', name: 'Bima Turbo', desc: 'Atlet super cepat dengan seragam hijau zamrud.', price: 350, shirt: 0x10b981, pants: 0x064e3b, cap: 0xffffff, skin: 0xd97706 },
+        { id: 'luna', name: 'Luna Star', desc: 'Juara olimpiade berjubah ungu galaksi.', price: 600, shirt: 0x8b5cf6, pants: 0x1e1b4b, cap: 0xfbbf24, skin: 0xfef3c7 },
+        { id: 'gold', name: 'Professor Gold', desc: 'Legenda Math Master berlapis emas murni!', price: 1000, shirt: 0xf59e0b, pants: 0x78350f, cap: 0xef4444, skin: 0xfde047 }
+    ];
+
+    const DEFAULT_SAVE = {
+        coins: 100,
+        highScore: 0,
+        unlockedLevel: 1,
+        selectedLevel: 1,
+        ownedChars: ['leo'],
+        equippedChar: 'leo',
+        stats: {
+            totalCorrect: 0,
+            totalWrong: 0,
+            byTopic: {}
+        }
+    };
+
+    let saveData = loadSave();
+    function loadSave() {
+        try {
+            const raw = localStorage.getItem('math_runner_save_v500');
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                return {
+                    ...DEFAULT_SAVE,
+                    ...parsed,
+                    stats: { ...DEFAULT_SAVE.stats, ...(parsed.stats || {}) }
+                };
+            }
+        } catch (e) { console.warn('Storage unavailable', e); }
+        return JSON.parse(JSON.stringify(DEFAULT_SAVE));
+    }
+    function persistSave() {
+        try {
+            localStorage.setItem('math_runner_save_v500', JSON.stringify(saveData));
+        } catch (e) {}
+        updateMenuUI();
+    }
+
+    /**
+     * ============================================================================
+     * 4. THREE.JS 3D ENGINE & GAMEPLAY LOGIC
+     * ============================================================================
+     */
+    const LANES = [-3.2, 0, 3.2];
+    let scene, camera, renderer;
+    let playerGroup, leftArm, rightArm, leftLeg, rightLeg, jetpackMesh, shieldBubble;
+    let trackTiles = [];
+    let obstacles = [];
+    let coinsList = [];
+    let powerupsList = [];
+    let mathGates = [];
+    let particles = [];
+
+    // Game State
+    let gameState = 'MENU'; // MENU, PLAYING, PAUSED, ENDED
+    let currentLevelCfg = LEVEL_CONFIGS[0];
+    let levelQuestions = [];
+    let questionCursor = 0;
+
+    let score = 0;
+    let sessionCoins = 0;
+    let sessionCorrect = 0;
+    let sessionWrong = 0;
+    let lastWrongExplanation = '';
+    let lives = 3;
+    let runSpeed = 25;
+    let distanceTraveled = 0;
+    let nextSpawnZ = -35;
+    let nextMathZ = -85;
+    let invulnerableTimer = 0;
+
+    // Player Movement State
+    let currentLane = 1; // 0: Left, 1: Center, 2: Right
+    let playerX = 0;
+    let playerY = 0;
+    let velocityY = 0;
+    let isJumping = false;
+    let isRolling = false;
+    let rollTimer = 0;
+    let runCycle = 0;
+
+    // Powerups State
+    let powerTimers = {
+        magnet: 0,
+        jetpack: 0,
+        shield: 0,
+        multiplier: 0
+    };
+
+    function initThree() {
+        const canvas = document.getElementById('game-canvas');
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x38bdf8);
+        scene.fog = new THREE.Fog(0x38bdf8, 45, 145);
+
+        camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.1, 180);
+        camera.position.set(0, 5.4, 9.2);
+        camera.lookAt(0, 1.8, -12);
+
+        renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = false;
+
+        const hemiLight = new THREE.HemisphereLight(0xffffff, 0x334155, 1.05);
+        scene.add(hemiLight);
+
+        const dirLight = new THREE.DirectionalLight(0xfffbeb, 0.9);
+        dirLight.position.set(15, 30, 20);
+        scene.add(dirLight);
+
+        const rim = new THREE.DirectionalLight(0x93c5fd, 0.45);
+        rim.position.set(-12, 10, -18);
+        scene.add(rim);
+
+        buildPlayerMesh();
+        buildInitialTrack();
+
+        window.addEventListener('resize', onWindowResize);
+    }
+
+    function onWindowResize() {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+
+    let rig = {}, camX = 0, camY = 5.4, camLookX = 0, camShake = 0, smoothDt = 1 / 60, hudTimer = 0;
+    const anim = { air: 0, land: 0, turn: 0, wasAir: false, t: 0 };
+    let shadowTex = null;
+    function getShadowTexture() {
+        if (shadowTex) return shadowTex;
+        const c = document.createElement('canvas');
+        c.width = c.height = 64;
+        const g = c.getContext('2d');
+        const grd = g.createRadialGradient(32, 32, 2, 32, 32, 32);
+        grd.addColorStop(0, 'rgba(0,0,0,0.55)');
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = grd;
+        g.fillRect(0, 0, 64, 64);
+        return (shadowTex = new THREE.CanvasTexture(c));
+    }
+
+    function buildPlayerMesh() {
+        if (playerGroup) scene.remove(playerGroup);
+        const c = CHARACTERS.find(x => x.id === saveData.equippedChar) || CHARACTERS[0];
+        const M = (col, r = 0.55) => new THREE.MeshStandardMaterial({ color: col, roughness: r, metalness: 0.04 });
+        const mShirt = M(c.shirt), mPants = M(c.pants), mSkin = M(c.skin, 0.75), mCap = M(c.cap, 0.45);
+        const mShoe = M(0xffffff, 0.4), mHair = M(0x3b2314, 0.8);
+        const mDark = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+        const mEye = new THREE.MeshBasicMaterial({ color: 0xffffff });
+        const S = (r, m, x = 1, y = 1, z = 1) => {
+            const s = new THREE.Mesh(new THREE.SphereGeometry(r, 20, 14), m);
+            s.scale.set(x, y, z);
+            return s;
+        };
+        const C = (rt, rb, h, m) => new THREE.Mesh(new THREE.CylinderGeometry(rt, rb, h, 16), m);
+        const at = (o, x, y, z) => { o.position.set(x, y, z); return o; };
+
+        playerGroup = new THREE.Group();
+        const body = new THREE.Group();
+        body.position.y = 1.25;
+        playerGroup.add(body);
+
+        // Badan: hoodie bulat + pinggul + tas ransel
+        const torso = new THREE.Group();
+        body.add(torso);
+        torso.add(at(S(0.5, mShirt, 1.0, 1.05, 0.72), 0, 0.5, 0));
+        torso.add(at(S(0.4, mPants, 1.1, 0.5, 0.8), 0, 0.02, 0));
+        torso.add(at(S(0.34, mCap, 1, 1.25, 0.55), 0, 0.55, 0.42));
+        torso.add(at(C(0.12, 0.12, 0.16, mSkin), 0, 1.04, 0));
+
+        // Kepala: wajah, rambut, topi, mata
+        const head = new THREE.Group();
+        head.position.y = 1.55;
+        body.add(head);
+        head.add(S(0.42, mSkin, 1, 1.05, 1));
+        head.add(at(S(0.4, mHair, 1, 0.9, 0.9), 0, 0.0, 0.1));
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(0.46, 20, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), mCap);
+        dome.position.y = 0.1;
+        head.add(dome);
+        head.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.05, 0.4), mCap), 0, 0.1, -0.5));
+        [-0.16, 0.16].forEach(sx => {
+            head.add(at(S(0.085, mEye, 1, 1.2, 0.6), sx, -0.02, -0.38));
+            head.add(at(S(0.045, mDark), sx, -0.02, -0.43));
+            head.add(at(S(0.07, mSkin), sx * 2.6, -0.02, 0));
+        });
+
+        // Lengan: bahu -> siku (dua ruas agar ayunan natural)
+        const mkArm = sx => {
+            const sh = new THREE.Group();
+            sh.position.set(sx, 0.88, 0);
+            body.add(sh);
+            sh.add(S(0.17, mShirt));
+            sh.add(at(C(0.13, 0.115, 0.45, mShirt), 0, -0.24, 0));
+            const el = new THREE.Group();
+            el.position.y = -0.46;
+            sh.add(el);
+            el.add(S(0.115, mShirt));
+            el.add(at(C(0.115, 0.1, 0.38, mShirt), 0, -0.2, 0));
+            el.add(at(S(0.12, mSkin), 0, -0.43, 0));
+            return { sh, el };
+        };
+        // Kaki: pinggul -> lutut + sepatu kets besar
+        const mkLeg = sx => {
+            const hip = new THREE.Group();
+            hip.position.set(sx, 0, 0);
+            body.add(hip);
+            hip.add(at(C(0.16, 0.14, 0.58, mPants), 0, -0.28, 0));
+            const kn = new THREE.Group();
+            kn.position.y = -0.56;
+            hip.add(kn);
+            kn.add(S(0.14, mPants));
+            kn.add(at(C(0.14, 0.11, 0.5, mPants), 0, -0.25, 0));
+            kn.add(at(S(0.17, mShoe, 1, 0.7, 1.7), 0, -0.55, -0.08));
+            kn.add(at(new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.07, 0.56), M(c.cap, 0.6)), 0, -0.66, -0.08));
+            return { hip, kn };
+        };
+        const la = mkArm(-0.6), ra = mkArm(0.6), ll = mkLeg(-0.24), rl = mkLeg(0.24);
+
+        // Jetpack dengan api
+        jetpackMesh = new THREE.Group();
+        body.add(jetpackMesh);
+        const tankM = M(0xf97316, 0.35);
+        rig.flames = [];
+        [-0.2, 0.2].forEach(x => {
+            jetpackMesh.add(at(C(0.14, 0.14, 0.7, tankM), x, 0.45, 0.74));
+            const fl = new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.7, 10), new THREE.MeshBasicMaterial({ color: 0xfbbf24 }));
+            fl.rotation.x = Math.PI;
+            fl.position.set(x, -0.25, 0.74);
+            jetpackMesh.add(fl);
+            rig.flames.push(fl);
+        });
+        jetpackMesh.visible = false;
+
+        shieldBubble = new THREE.Mesh(
+            new THREE.SphereGeometry(1.9, 24, 18),
+            new THREE.MeshBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.28, depthWrite: false })
+        );
+        shieldBubble.position.y = 1.7;
+        shieldBubble.visible = false;
+        playerGroup.add(shieldBubble);
+
+        // Bayangan lembut di tanah
+        const shadow = new THREE.Mesh(
+            new THREE.PlaneGeometry(1.9, 1.9),
+            new THREE.MeshBasicMaterial({ map: getShadowTexture(), transparent: true, depthWrite: false })
+        );
+        shadow.rotation.x = -Math.PI / 2;
+        shadow.position.y = 0.07;
+        playerGroup.add(shadow);
+
+        rig = Object.assign(rig, { body, torso, head, shadow, lSh: la.sh, rSh: ra.sh, lEl: la.el, rEl: ra.el, lHip: ll.hip, rHip: rl.hip, lKn: ll.kn, rKn: rl.kn });
+        leftArm = la.sh; rightArm = ra.sh; leftLeg = ll.hip; rightLeg = rl.hip;
+
+        playerGroup.scale.setScalar(0.92);
+        scene.add(playerGroup);
+
+        // reset kamera & animasi
+        camX = 0; camY = 5.4; camLookX = 0; camShake = 0;
+        anim.air = 0; anim.land = 0; anim.turn = 0; anim.wasAir = false;
+        if (camera) {
+            camera.fov = 62;
+            camera.updateProjectionMatrix();
+            camera.position.set(0, 5.4, 9.2);
+            camera.lookAt(0, 1.8, -12);
+        }
+    }
+
+    const mixv = (a, b, t) => a + (b - a) * t;
+    // pose: [paha kiri, paha kanan, lutut kiri, lutut kanan, bahu kiri, bahu kanan, siku kiri, siku kanan, condong badan, tinggi badan]
+    const POSE_JUMP = [1.0, -0.35, -1.1, -0.25, 2.3, 1.7, 0.3, 0.4, -0.1, 1.25];
+    const POSE_FLY = [0.1, -0.1, -0.15, -0.15, 2.9, 2.9, 0.1, 0.1, -0.95, 1.4];
+    const POSE_TUCK = [1.7, 1.7, -2.1, -2.1, 0.9, 0.9, 1.6, 1.6, -0.2, 0.98];
+
+    function animateCharacter(dt, menu, now) {
+        const k = f => 1 - Math.exp(-dt * f);
+        const R = rig;
+        const jet = !menu && powerTimers.jetpack > 0;
+        const air = !menu && (isJumping || jet);
+        if (anim.wasAir && !air) anim.land = 1;
+        anim.wasAir = air;
+        anim.land = Math.max(0, anim.land - dt * 5);
+        anim.air += ((air ? 1 : 0) - anim.air) * k(16);
+        anim.t += dt;
+
+        const dx = menu ? 0 : LANES[currentLane] - playerX;
+        anim.turn += (Math.max(-1, Math.min(1, dx / 3.2)) - anim.turn) * k(10);
+
+        const roll = !menu && isRolling;
+        const phase = roll ? Math.min(1, Math.max(0, 1 - rollTimer / 0.65)) : 0;
+        const tuck = roll ? Math.sin(phase * Math.PI) : 0;
+        const flip = roll ? -phase * Math.PI * 2 : 0;
+
+        const p = runCycle, sL = Math.sin(p), cp = Math.cos(p);
+        let base;
+        if (menu) {
+            const sw = Math.sin(now * 0.002) * 0.1;
+            base = [0.04, -0.04, -0.1, -0.1, sw, -sw, 0.25, 0.25, -0.04, 1.25 + Math.sin(now * 0.003) * 0.012];
+        } else {
+            base = [
+                sL * 0.95, -sL * 0.95,
+                -(Math.max(0, cp) * 1.15 + 0.12), -(Math.max(0, -cp) * 1.15 + 0.12),
+                -sL * 0.85, sL * 0.85,
+                0.9 + 0.3 * cp, 0.9 - 0.3 * cp,
+                -0.2, 1.17 + Math.abs(sL) * 0.08
+            ];
+        }
+        const airPose = jet ? POSE_FLY : POSE_JUMP;
+        const v = base.map((x, i) => mixv(mixv(x, airPose[i], anim.air), POSE_TUCK[i], tuck));
+
+        const land = anim.land;
+        v[2] -= land * 0.5; v[3] -= land * 0.5; v[9] -= land * 0.12;
+        const pitch = v[8] + flip + camShake * 0.4;
+
+        R.lHip.rotation.x = v[0]; R.rHip.rotation.x = v[1];
+        R.lKn.rotation.x = v[2]; R.rKn.rotation.x = v[3];
+        R.lSh.rotation.x = v[4]; R.rSh.rotation.x = v[5];
+        R.lEl.rotation.x = v[6]; R.rEl.rotation.x = v[7];
+        const spread = menu ? 0.2 : 0.1;
+        R.lSh.rotation.z = -spread; R.rSh.rotation.z = spread;
+        R.body.rotation.x = pitch;
+        R.body.position.y = v[9];
+        R.head.rotation.x = Math.max(-0.5, Math.min(0.5, -(v[8] + camShake * 0.4) * 0.6));
+        R.torso.scale.y = menu ? 1 + Math.sin(now * 0.003) * 0.02 : 1;
+
+        playerGroup.rotation.set(0, -anim.turn * 0.45, -anim.turn * 0.3);
+
+        if (jetpackMesh.visible) R.flames.forEach(f => { f.scale.y = 0.8 + Math.random() * 0.6; });
+        if (shieldBubble.visible) {
+            shieldBubble.rotation.y += dt;
+            shieldBubble.scale.setScalar(1 + Math.sin(anim.t * 6) * 0.04);
+        }
+
+        const h = Math.max(0, playerGroup.position.y);
+        const ss = Math.max(0.4, 1 - h * 0.12);
+        R.shadow.position.y = (0.07 - playerGroup.position.y) / 0.92;
+        R.shadow.scale.set(ss, ss, ss);
+        R.shadow.material.opacity = ss;
+    }
+
+    function updateCamera(dt, speed) {
+        const k = 1 - Math.exp(-dt * 6);
+        camX += (playerX * 0.5 - camX) * k;
+        camY += (5.4 + Math.min(playerY, 4) * 0.3 - camY) * k;
+        camLookX += (playerX * 0.35 - camLookX) * k;
+        camShake = Math.max(0, camShake - dt * 2.2);
+        const sx = (Math.random() - 0.5) * camShake, sy = (Math.random() - 0.5) * camShake;
+        camera.position.set(camX + sx, camY + sy, 9.2);
+        camera.lookAt(camLookX, 1.8, -12);
+        const tf = 62 + Math.min(9, Math.max(0, speed - 24) * 0.3);
+        if (Math.abs(camera.fov - tf) > 0.05) {
+            camera.fov += (tf - camera.fov) * k;
+            camera.updateProjectionMatrix();
+        }
+    }
+
+    function createTrackSegment(zPos) {
+        const seg = new THREE.Group();
+        seg.position.z = zPos;
+
+        const bed = new THREE.Mesh(
+            new THREE.BoxGeometry(11.6, 0.4, 20),
+            new THREE.MeshLambertMaterial({ color: 0x475569 })
+        );
+        bed.position.y = -0.2;
+        seg.add(bed);
+
+        const platMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
+        const leftPlat = new THREE.Mesh(new THREE.BoxGeometry(6, 1.1, 20), platMat);
+        leftPlat.position.set(-8.8, 0.35, 0);
+        const rightPlat = new THREE.Mesh(new THREE.BoxGeometry(6, 1.1, 20), platMat);
+        rightPlat.position.set(8.8, 0.35, 0);
+        seg.add(leftPlat, rightPlat);
+
+        const lineMat = new THREE.MeshBasicMaterial({ color: 0xfacc15 });
+        const lLine = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 20), lineMat);
+        lLine.position.set(-6.0, 0.92, 0);
+        const rLine = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.05, 20), lineMat);
+        rLine.position.set(6.0, 0.92, 0);
+        seg.add(lLine, rLine);
+
+        const railMat = new THREE.MeshLambertMaterial({ color: 0xe2e8f0 });
+        const woodMat = new THREE.MeshLambertMaterial({ color: 0x78350f });
+
+        LANES.forEach(lx => {
+            const r1 = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 20), railMat);
+            r1.position.set(lx - 0.75, 0.08, 0);
+            const r2 = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 20), railMat);
+            r2.position.set(lx + 0.75, 0.08, 0);
+            seg.add(r1, r2);
+
+            for (let sz = -8; sz <= 8; sz += 2.5) {
+                const sleeper = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.08, 0.45), woodMat);
+                sleeper.position.set(lx, 0.02, sz);
+                seg.add(sleeper);
+            }
+        });
+
+        const buildingColors = [0xf97316, 0x3b82f6, 0x10b981, 0x8b5cf6, 0xec4899, 0xeab308];
+        [-11.5, 11.5].forEach((bx, idx) => {
+            const h = 7 + ((Math.abs(Math.round(zPos)) + idx * 5) % 8);
+            const col = buildingColors[(Math.abs(Math.round(zPos / 20)) + idx) % buildingColors.length];
+            const bldg = new THREE.Mesh(
+                new THREE.BoxGeometry(4.5, h, 16),
+                new THREE.MeshLambertMaterial({ color: col })
+            );
+            bldg.position.set(bx, h / 2 + 0.8, 0);
+            seg.add(bldg);
+        });
+
+        scene.add(seg);
+        return seg;
+    }
+
+    function buildInitialTrack() {
+        trackTiles.forEach(t => scene.remove(t));
+        trackTiles = [];
+        for (let i = 0; i < 9; i++) {
+            trackTiles.push(createTrackSegment(20 - i * 20));
+        }
+    }
+
+    function applyEnvironmentTheme(env) {
+        const themes = {
+            day: { sky: 0x38bdf8, fog: 0x38bdf8 },
+            sunset: { sky: 0xfb7185, fog: 0xfdba74 },
+            night: { sky: 0x0f172a, fog: 0x1e1b4b },
+            neon: { sky: 0x2e1065, fog: 0x4c1d95 },
+            cyber: { sky: 0x042f2e, fog: 0x115e59 }
+        };
+        const t = themes[env] || themes.day;
+        scene.background = new THREE.Color(t.sky);
+        scene.fog = new THREE.Fog(t.fog, 45, 145);
+    }
+
+    /**
+     * ============================================================================
+     * 5. OBSTACLES, COINS, POWER-UPS & 3D MATH ANSWER GATES
+     * ============================================================================
+     */
+    function clearEntities() {
+        obstacles.forEach(o => scene.remove(o.mesh));
+        coinsList.forEach(c => scene.remove(c.mesh));
+        powerupsList.forEach(p => scene.remove(p.mesh));
+        mathGates.forEach(g => scene.remove(g.group));
+        particles.forEach(p => scene.remove(p.mesh));
+
+        obstacles = [];
+        coinsList = [];
+        powerupsList = [];
+        mathGates = [];
+        particles = [];
+    }
+
+    function spawnObstacleRow(zPos) {
+        const blockedLanes = [0, 1, 2].sort(() => Math.random() - 0.5).slice(0, Math.random() < 0.45 ? 2 : 1);
+
+        blockedLanes.forEach(lane => {
+            const rollType = Math.random();
+            if (rollType < 0.42) {
+                const trainGroup = new THREE.Group();
+                const colors = [0xef4444, 0x2563eb, 0xf59e0b, 0x10b981];
+                const bodyColor = colors[Math.floor(Math.random() * colors.length)];
+
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.3, 3.1, 11),
+                    new THREE.MeshLambertMaterial({ color: bodyColor })
+                );
+                body.position.y = 1.65;
+                trainGroup.add(body);
+
+                const glass = new THREE.Mesh(
+                    new THREE.BoxGeometry(1.9, 1.0, 0.2),
+                    new THREE.MeshBasicMaterial({ color: 0xe0f2fe })
+                );
+                glass.position.set(0, 2.3, 5.52);
+                trainGroup.add(glass);
+
+                const lightMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+                const hl1 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.2), lightMat);
+                hl1.position.set(-0.7, 1.0, 5.52);
+                const hl2 = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.3, 0.2), lightMat);
+                hl2.position.set(0.7, 1.0, 5.52);
+                trainGroup.add(hl1, hl2);
+
+                trainGroup.position.set(LANES[lane], 0, zPos);
+                scene.add(trainGroup);
+
+                obstacles.push({
+                    type: 'train',
+                    lane,
+                    z: zPos,
+                    length: 11,
+                    speedOffset: Math.random() < 0.5 ? 9 : 0,
+                    mesh: trainGroup
+                });
+            } else if (rollType < 0.74) {
+                const hurdle = new THREE.Group();
+                const postMat = new THREE.MeshLambertMaterial({ color: 0xfacc15 });
+                const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.35, 0.25), postMat);
+                p1.position.set(-1.0, 0.68, 0);
+                const p2 = new THREE.Mesh(new THREE.BoxGeometry(0.25, 1.35, 0.25), postMat);
+                p2.position.set(1.0, 0.68, 0);
+
+                const bar = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.3, 0.55, 0.3),
+                    new THREE.MeshLambertMaterial({ color: 0xf43f5e })
+                );
+                bar.position.set(0, 1.05, 0);
+                hurdle.add(p1, p2, bar);
+
+                hurdle.position.set(LANES[lane], 0, zPos);
+                scene.add(hurdle);
+
+                obstacles.push({
+                    type: 'hurdle',
+                    lane,
+                    z: zPos,
+                    length: 1.2,
+                    speedOffset: 0,
+                    mesh: hurdle
+                });
+            } else {
+                const gate = new THREE.Group();
+                const pillarMat = new THREE.MeshLambertMaterial({ color: 0x64748b });
+                const p1 = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.4, 1.2), pillarMat);
+                p1.position.set(-1.05, 1.7, 0);
+                const p2 = new THREE.Mesh(new THREE.BoxGeometry(0.35, 3.4, 1.2), pillarMat);
+                p2.position.set(1.05, 1.7, 0);
+
+                const topBlock = new THREE.Mesh(
+                    new THREE.BoxGeometry(2.45, 1.9, 1.3),
+                    new THREE.MeshLambertMaterial({ color: 0x8b5cf6 })
+                );
+                topBlock.position.set(0, 2.45, 0);
+                gate.add(p1, p2, topBlock);
+
+                gate.position.set(LANES[lane], 0, zPos);
+                scene.add(gate);
+
+                obstacles.push({
+                    type: 'tunnel',
+                    lane,
+                    z: zPos,
+                    length: 1.5,
+                    speedOffset: 0,
+                    mesh: gate
+                });
+            }
+        });
+
+        const freeLanes = [0, 1, 2].filter(l => !blockedLanes.includes(l));
+        if (freeLanes.length > 0) {
+            const coinLane = freeLanes[0];
+            for (let i = 0; i < 4; i++) {
+                spawnCoin(coinLane, zPos - i * 2.6, 1.0);
+            }
+        }
+
+        if (Math.random() < 0.24 && freeLanes.length > 0) {
+            const pLane = freeLanes[freeLanes.length - 1];
+            spawnPowerUp(pLane, zPos - 12);
+        }
+    }
+
+    function spawnCoin(lane, zPos, yPos = 1.0) {
+        const coinMesh = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.45, 0.45, 0.16, 14),
+            new THREE.MeshLambertMaterial({ color: 0xfacc15, emissive: 0xca8a04, emissiveIntensity: 0.35 })
+        );
+        coinMesh.rotation.x = Math.PI / 2;
+        coinMesh.position.set(LANES[lane], yPos, zPos);
+        scene.add(coinMesh);
+        coinsList.push({ lane, z: zPos, mesh: coinMesh });
+    }
+
+    function spawnPowerUp(lane, zPos) {
+        const types = ['magnet', 'jetpack', 'shield', 'multiplier'];
+        const type = types[Math.floor(Math.random() * types.length)];
+        const colors = {
+            magnet: 0xef4444,
+            jetpack: 0xf97316,
+            shield: 0x38bdf8,
+            multiplier: 0xa855f7
+        };
+
+        const mesh = new THREE.Mesh(
+            new THREE.OctahedronGeometry(0.65, 0),
+            new THREE.MeshLambertMaterial({ color: colors[type], emissive: colors[type], emissiveIntensity: 0.45 })
+        );
+        mesh.position.set(LANES[lane], 1.25, zPos);
+        scene.add(mesh);
+        powerupsList.push({ type, lane, z: zPos, mesh });
+    }
+
+    function createAnswerSignTexture(numberText) {
+        const c = document.createElement('canvas');
+        c.width = 256;
+        c.height = 192;
+        const ctx = c.getContext('2d');
+
+        ctx.fillStyle = '#1e1b4b';
+        ctx.beginPath();
+        ctx.roundRect(10, 10, 236, 172, 28);
+        ctx.fill();
+
+        ctx.lineWidth = 10;
+        ctx.strokeStyle = '#facc15';
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 76px Fredoka, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(String(numberText), 128, 102);
+
+        return new THREE.CanvasTexture(c);
+    }
+
+    function spawnMathChallenge(zPos) {
+        if (questionCursor >= levelQuestions.length) {
+            levelQuestions = questionBank.getShuffledQuestions(currentLevelCfg.id);
+            questionCursor = 0;
+        }
+        const qObj = levelQuestions[questionCursor++];
+
+        const gateGroup = new THREE.Group();
+        gateGroup.position.z = zPos;
+
+        const arch = new THREE.Mesh(
+            new THREE.BoxGeometry(10.6, 0.5, 0.5),
+            new THREE.MeshLambertMaterial({ color: 0xfacc15 })
+        );
+        arch.position.set(0, 4.3, 0);
+        gateGroup.add(arch);
+
+        qObj.choices.forEach((choiceVal, laneIdx) => {
+            const laneGroup = new THREE.Group();
+            laneGroup.position.x = LANES[laneIdx];
+
+            const portal = new THREE.Mesh(
+                new THREE.PlaneGeometry(2.4, 3.6),
+                new THREE.MeshBasicMaterial({
+                    color: 0x3b82f6,
+                    transparent: true,
+                    opacity: 0.35,
+                    side: THREE.DoubleSide
+                })
+            );
+            portal.position.y = 1.8;
+            laneGroup.add(portal);
+
+            const board = new THREE.Mesh(
+                new THREE.PlaneGeometry(2.35, 1.75),
+                new THREE.MeshBasicMaterial({ map: createAnswerSignTexture(choiceVal), transparent: true })
+            );
+            board.position.set(0, 2.7, 0.05);
+            laneGroup.add(board);
+
+            gateGroup.add(laneGroup);
+        });
+
+        scene.add(gateGroup);
+        mathGates.push({
+            z: zPos,
+            questionObj: qObj,
+            resolved: false,
+            announced: false,
+            group: gateGroup
+        });
+    }
+
+    function spawnBurstParticles(x, y, z, colorHex) {
+        const geo = new THREE.BoxGeometry(0.22, 0.22, 0.22);
+        const mat = new THREE.MeshBasicMaterial({ color: colorHex });
+        for (let i = 0; i < 14; i++) {
+            const mesh = new THREE.Mesh(geo, mat);
+            mesh.position.set(x, y, z);
+            scene.add(mesh);
+            particles.push({
+                mesh,
+                vx: (Math.random() - 0.5) * 9,
+                vy: Math.random() * 8 + 2,
+                vz: (Math.random() - 0.5) * 9,
+                life: 0.65
+            });
+        }
+    }
+
+    /**
+     * ============================================================================
+     * 6. GAME LOOP, COLLISIONS & EDUCATIONAL FEEDBACK
+     * ============================================================================
+     */
+    function startLevel(levelId) {
+        sfx.init();
+        currentLevelCfg = LEVEL_CONFIGS[levelId - 1] || LEVEL_CONFIGS[0];
+        saveData.selectedLevel = currentLevelCfg.id;
+        persistSave();
+
+        applyEnvironmentTheme(currentLevelCfg.env);
+        buildPlayerMesh();
+        buildInitialTrack();
+        clearEntities();
+
+        levelQuestions = questionBank.getShuffledQuestions(currentLevelCfg.id);
+        questionCursor = 0;
+
+        score = 0;
+        sessionCoins = 0;
+        sessionCorrect = 0;
+        sessionWrong = 0;
+        lastWrongExplanation = '';
+        lives = 3;
+        runSpeed = currentLevelCfg.speed;
+        distanceTraveled = 0;
+        invulnerableTimer = 0;
+
+        currentLane = 1;
+        playerX = 0;
+        playerY = 0;
+        velocityY = 0;
+        isJumping = false;
+        isRolling = false;
+        rollTimer = 0;
+
+        powerTimers = { magnet: 0, jetpack: 0, shield: 0, multiplier: 0 };
+
+        nextSpawnZ = -40;
+        nextMathZ = -95;
+        for (let i = 0; i < 4; i++) {
+            if (Math.abs(nextSpawnZ - nextMathZ) > 22) {
+                spawnObstacleRow(nextSpawnZ);
+            }
+            nextSpawnZ -= 28;
+        }
+        spawnMathChallenge(nextMathZ);
+        nextMathZ -= 115;
+
+        hideAllOverlays();
+        document.getElementById('hud').classList.remove('hidden');
+        document.getElementById('math-question-box').classList.add('hidden');
+        document.getElementById('explanation-toast').classList.add('hidden');
+        updateHUD();
+
+        gameState = 'PLAYING';
+    }
+
+    function showExplanationToast(isCorrect, textDetail) {
+        const toast = document.getElementById('explanation-toast');
+        const statusEl = document.getElementById('exp-status');
+        const detailEl = document.getElementById('exp-detail');
+
+        toast.classList.remove('hidden', 'toast-anim', 'border-emerald-400', 'border-rose-400');
+        void toast.offsetWidth;
+
+        if (isCorrect) {
+            toast.classList.add('border-emerald-400', 'toast-anim');
+            statusEl.className = 'text-xs font-extrabold uppercase tracking-wider text-emerald-400 mb-1';
+            statusEl.textContent = '✅ JAWABAN BENAR! +100 POIN & BONUS KOIN';
+        } else {
+            toast.classList.add('border-rose-400', 'toast-anim');
+            statusEl.className = 'text-xs font-extrabold uppercase tracking-wider text-rose-400 mb-1';
+            statusEl.textContent = '❌ KURANG TEPAT! -50 POIN & -1 NYAWA';
+        }
+        detailEl.textContent = `Pembahasan: ${textDetail}`;
+    }
+
+    function recordTopicStat(topic, isCorrect) {
+        if (!saveData.stats.byTopic[topic]) {
+            saveData.stats.byTopic[topic] = { correct: 0, wrong: 0 };
+        }
+        if (isCorrect) {
+            saveData.stats.totalCorrect++;
+            saveData.stats.byTopic[topic].correct++;
+        } else {
+            saveData.stats.totalWrong++;
+            saveData.stats.byTopic[topic].wrong++;
+        }
+    }
+
+    function handleDamage(reasonExplanation = '') {
+        if (invulnerableTimer > 0 || powerTimers.jetpack > 0) return;
+
+        if (powerTimers.shield > 0) {
+            powerTimers.shield = 0;
+            camShake = 0.3;
+            invulnerableTimer = 1.2;
+            sfx.crash();
+            spawnBurstParticles(playerX, playerY + 1.5, 0, 0x38bdf8);
+            return;
+        }
+
+        lives--;
+        camShake = 0.6;
+        invulnerableTimer = 1.6;
+        sfx.crash();
+        spawnBurstParticles(playerX, playerY + 1.2, 0, 0xef4444);
+        updateHUD();
+
+        if (lives <= 0) {
+            if (reasonExplanation) lastWrongExplanation = reasonExplanation;
+            endGame(false);
+        }
+    }
+
+    function endGame(isWin) {
+        gameState = 'ENDED';
+        document.getElementById('math-question-box').classList.add('hidden');
+
+        saveData.coins += sessionCoins;
+        if (score > saveData.highScore) saveData.highScore = Math.floor(score);
+        if (isWin && currentLevelCfg.id === saveData.unlockedLevel && saveData.unlockedLevel < 500) {
+            saveData.unlockedLevel++;
+        }
+        persistSave();
+
+        const modal = document.getElementById('modal-endgame');
+        const emojiEl = document.getElementById('endgame-emoji');
+        const titleEl = document.getElementById('endgame-title');
+        const subEl = document.getElementById('endgame-subtitle');
+        const primaryBtn = document.getElementById('btn-end-primary');
+        const reviewBox = document.getElementById('end-last-review');
+
+        document.getElementById('end-score').textContent = Math.floor(score);
+        document.getElementById('end-coins').textContent = `+${sessionCoins} 🪙`;
+        document.getElementById('end-correct').textContent = `${sessionCorrect} Soal`;
+        document.getElementById('end-wrong').textContent = `${sessionWrong} Soal`;
+
+        if (lastWrongExplanation && !isWin) {
+            reviewBox.classList.remove('hidden');
+            reviewBox.innerHTML = `<strong>💡 Catatan Belajar:</strong><br>${lastWrongExplanation}`;
+        } else {
+            reviewBox.classList.add('hidden');
+        }
+
+        if (isWin) {
+            sfx.levelWin();
+            emojiEl.textContent = '🏆';
+            titleEl.textContent = `LEVEL ${currentLevelCfg.id} SELESAI!`;
+            subEl.textContent = `Luar biasa! Kamu menguasai materi ${currentLevelCfg.topic}!`;
+            if (currentLevelCfg.id < 500) {
+                primaryBtn.classList.remove('hidden');
+                primaryBtn.textContent = `LANJUT LEVEL ${currentLevelCfg.id + 1} ▶️`;
+                primaryBtn.onclick = () => startLevel(currentLevelCfg.id + 1);
+            } else {
+                primaryBtn.classList.add('hidden');
+            }
+        } else {
+            emojiEl.textContent = '💥';
+            titleEl.textContent = 'PERMAINAN BERAKHIR';
+            subEl.textContent = 'Jangan menyerah! Pelajari pembahasannya dan coba lagi!';
+            primaryBtn.classList.add('hidden');
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    function updateHUD() {
+        const heartsStr = '❤️'.repeat(Math.max(0, lives)) + '🖤'.repeat(Math.max(0, 3 - lives));
+        document.getElementById('hud-hearts').textContent = heartsStr;
+        document.getElementById('hud-level-badge').textContent = `LV ${currentLevelCfg.id}`;
+        document.getElementById('hud-score').textContent = Math.floor(score);
+        document.getElementById('hud-coins').textContent = sessionCoins;
+
+        const pct = Math.min(100, (score / currentLevelCfg.target) * 100);
+        document.getElementById('hud-target-text').textContent = `${Math.floor(score)} / ${currentLevelCfg.target}`;
+        document.getElementById('hud-target-bar').style.width = `${pct}%`;
+
+        const multEl = document.getElementById('hud-multiplier');
+        if (powerTimers.multiplier > 0) multEl.classList.remove('hidden');
+        else multEl.classList.add('hidden');
+
+        const pContainer = document.getElementById('active-powerups');
+        pContainer.innerHTML = '';
+        const labels = {
+            magnet: { icon: '🧲', name: 'Magnet', col: 'bg-rose-600' },
+            jetpack: { icon: '🚀', name: 'Jetpack', col: 'bg-orange-500' },
+            shield: { icon: '🛡️', name: 'Perisai', col: 'bg-sky-500' },
+            multiplier: { icon: '✨', name: '2x Skor', col: 'bg-purple-600' }
+        };
+        Object.keys(powerTimers).forEach(k => {
+            if (powerTimers[k] > 0) {
+                const badge = document.createElement('div');
+                badge.className = `${labels[k].col} text-white text-xs font-extrabold px-2.5 py-1 rounded-full shadow-md border border-white/30`;
+                badge.textContent = `${labels[k].icon} ${labels[k].name} (${Math.ceil(powerTimers[k])}s)`;
+                pContainer.appendChild(badge);
+            }
+        });
+    }
+
+    let lastTime = performance.now();
+    function animate(now) {
+        requestAnimationFrame(animate);
+        const rawDt = Math.min((now - lastTime) / 1000, 0.05);
+        lastTime = now;
+        smoothDt += (rawDt - smoothDt) * 0.25;
+        const dt = smoothDt;
+
+        if (gameState === 'MENU') {
+            playerGroup.position.set(0, 0, 0);
+            animateCharacter(dt, true, now);
+            playerGroup.rotation.set(0, Math.PI + Math.sin(now * 0.0012) * 0.4, 0);
+            renderer.render(scene, camera);
+            return;
+        }
+
+        if (gameState !== 'PLAYING') {
+            renderer.render(scene, camera);
+            return;
+        }
+
+
+        const effectiveSpeed = (runSpeed + Math.min(12, distanceTraveled * 0.004)) * (powerTimers.jetpack > 0 ? 1.45 : 1);
+        const dz = effectiveSpeed * dt;
+        distanceTraveled += dz;
+
+        const mult = powerTimers.multiplier > 0 ? 2 : 1;
+        score += dz * 0.65 * mult;
+
+        if (score >= currentLevelCfg.target) {
+            endGame(true);
+            return;
+        }
+
+        Object.keys(powerTimers).forEach(k => {
+            if (powerTimers[k] > 0) powerTimers[k] = Math.max(0, powerTimers[k] - dt);
+        });
+        jetpackMesh.visible = powerTimers.jetpack > 0;
+        shieldBubble.visible = powerTimers.shield > 0;
+
+        if (invulnerableTimer > 0) {
+            invulnerableTimer -= dt;
+            playerGroup.visible = Math.floor(invulnerableTimer * 16) % 2 === 0;
+        } else {
+            playerGroup.visible = true;
+        }
+
+        const targetX = LANES[currentLane];
+        playerX += (targetX - playerX) * (1 - Math.exp(-dt * 14));
+        playerGroup.position.x = playerX;
+
+        if (powerTimers.jetpack > 0) {
+            playerY += (5.2 - playerY) * Math.min(1, dt * 8);
+            velocityY = 0;
+            isJumping = false;
+            isRolling = false;
+            if (Math.random() < 0.18) {
+                spawnCoin(currentLane, -35, 5.2);
+            }
+        } else {
+            if (isJumping) {
+                velocityY -= 19 * dt;
+                playerY += velocityY * dt;
+                velocityY -= 19 * dt;
+                if (playerY <= 0) {
+                    playerY = 0;
+                    velocityY = 0;
+                    isJumping = false;
+                }
+            } else {
+                playerY += (0 - playerY) * Math.min(1, dt * 12);
+            }
+        }
+        playerGroup.position.y = playerY;
+
+        if (isRolling) {
+            rollTimer -= dt;
+            if (rollTimer <= 0) isRolling = false;
+        }
+        runCycle += dt * (effectiveSpeed * 0.55);
+        animateCharacter(dt, false, now);
+        updateCamera(dt, effectiveSpeed);
+
+        trackTiles.forEach(seg => {
+            seg.position.z += dz;
+            if (seg.position.z > 25) {
+                seg.position.z -= 180;
+            }
+        });
+
+        nextSpawnZ += dz;
+        nextMathZ += dz;
+
+        if (nextMathZ > -110) {
+            spawnMathChallenge(nextMathZ);
+            nextMathZ -= 115;
+        }
+
+        if (nextSpawnZ > -105) {
+            const nearMathGate = mathGates.some(g => Math.abs(g.z - nextSpawnZ) < 26);
+            if (!nearMathGate) {
+                spawnObstacleRow(nextSpawnZ);
+            }
+            nextSpawnZ -= 27;
+        }
+
+        for (let i = obstacles.length - 1; i >= 0; i--) {
+            const obs = obstacles[i];
+            obs.z += (effectiveSpeed + obs.speedOffset) * dt;
+            obs.mesh.position.z = obs.z;
+
+            const halfLen = obs.length * 0.5;
+            if (Math.abs(obs.z) < halfLen + 0.45 && Math.abs(playerX - LANES[obs.lane]) < 0.95) {
+                if (obs.type === 'train' && playerY < 2.9) {
+                    handleDamage();
+                } else if (obs.type === 'hurdle' && playerY < 1.15) {
+                    handleDamage();
+                } else if (obs.type === 'tunnel' && !isRolling && playerY < 2.8) {
+                    handleDamage();
+                }
+            }
+
+            if (obs.z > 18) {
+                scene.remove(obs.mesh);
+                obstacles.splice(i, 1);
+            }
+        }
+
+        for (let i = coinsList.length - 1; i >= 0; i--) {
+            const c = coinsList[i];
+            c.z += dz;
+            c.mesh.position.z = c.z;
+            c.mesh.rotation.z += dt * 4;
+
+            if (powerTimers.magnet > 0 && c.z > -28 && c.z < 5) {
+                c.mesh.position.x += (playerX - c.mesh.position.x) * Math.min(1, dt * 10);
+                c.mesh.position.y += ((playerY + 1.2) - c.mesh.position.y) * Math.min(1, dt * 10);
+            }
+
+            const distSq =
+                Math.pow(c.mesh.position.x - playerX, 2) +
+                Math.pow(c.mesh.position.y - (playerY + 1.1), 2) +
+                Math.pow(c.z, 2);
+
+            if (distSq < 1.9) {
+                sessionCoins += 1;
+                score += 10 * mult;
+                sfx.coin();
+                spawnBurstParticles(c.mesh.position.x, c.mesh.position.y, c.z, 0xfacc15);
+                scene.remove(c.mesh);
+                coinsList.splice(i, 1);
+                continue;
+            }
+
+            if (c.z > 14) {
+                scene.remove(c.mesh);
+                coinsList.splice(i, 1);
+            }
+        }
+
+        for (let i = powerupsList.length - 1; i >= 0; i--) {
+            const p = powerupsList[i];
+            p.z += dz;
+            p.mesh.position.z = p.z;
+            p.mesh.rotation.y += dt * 3;
+
+            if (Math.abs(p.z) < 1.3 && Math.abs(playerX - LANES[p.lane]) < 1.1 && Math.abs(playerY - 1.2) < 1.8) {
+                powerTimers[p.type] = 8.5;
+                sfx.powerup();
+                spawnBurstParticles(p.mesh.position.x, p.mesh.position.y, p.z, 0x38bdf8);
+                scene.remove(p.mesh);
+                powerupsList.splice(i, 1);
+                continue;
+            }
+
+            if (p.z > 14) {
+                scene.remove(p.mesh);
+                powerupsList.splice(i, 1);
+            }
+        }
+
+        const qBox = document.getElementById('math-question-box');
+        const qText = document.getElementById('math-question-text');
+        let activeGateVisible = false;
+
+        for (let i = mathGates.length - 1; i >= 0; i--) {
+            const gate = mathGates[i];
+            gate.z += dz;
+            gate.group.position.z = gate.z;
+
+            if (!gate.resolved && gate.z > -95 && gate.z < 1) {
+                activeGateVisible = true;
+                if (!gate.announced) {
+                    gate.announced = true;
+                    qText.textContent = gate.questionObj.q;
+                }
+            }
+
+            if (!gate.resolved && gate.z >= 0) {
+                gate.resolved = true;
+                const chosenValue = gate.questionObj.choices[currentLane];
+                const isRight = chosenValue === gate.questionObj.answer;
+
+                recordTopicStat(currentLevelCfg.topic, isRight);
+
+                if (isRight) {
+                    sessionCorrect++;
+                    score += 100 * mult;
+                    sessionCoins += 10;
+                    sfx.correct();
+                    spawnBurstParticles(playerX, playerY + 2, 0, 0x10b981);
+                    showExplanationToast(true, gate.questionObj.explanation);
+                } else {
+                    sessionWrong++;
+                    score = Math.max(0, score - 50);
+                    lastWrongExplanation = `${gate.questionObj.q} → Jawaban benar: ${gate.questionObj.answer}. (${gate.questionObj.explanation})`;
+                    sfx.wrong();
+                    showExplanationToast(false, gate.questionObj.explanation);
+                    handleDamage(lastWrongExplanation);
+                }
+            }
+
+            if (gate.z > 15) {
+                scene.remove(gate.group);
+                mathGates.splice(i, 1);
+            }
+        }
+
+        if (activeGateVisible) qBox.classList.remove('hidden');
+        else qBox.classList.add('hidden');
+
+        for (let i = particles.length - 1; i >= 0; i--) {
+            const pt = particles[i];
+            pt.life -= dt;
+            pt.mesh.position.x += pt.vx * dt;
+            pt.mesh.position.y += pt.vy * dt;
+            pt.mesh.position.z += pt.vz * dt;
+            pt.vy -= 18 * dt;
+            pt.mesh.scale.setScalar(Math.max(0.01, pt.life * 1.5));
+            if (pt.life <= 0) {
+                scene.remove(pt.mesh);
+                particles.splice(i, 1);
+            }
+        }
+
+        hudTimer -= dt;
+        if (hudTimer <= 0) {
+            hudTimer = 0.1;
+            updateHUD();
+        }
+        renderer.render(scene, camera);
+    }
+
+    /**
+     * ============================================================================
+     * 7. SWIPE, KEYBOARD & BUTTON INPUT HANDLERS
+     * ============================================================================
+     */
+    function moveLeft() {
+        if (gameState !== 'PLAYING') return;
+        if (currentLane > 0) {
+            currentLane--;
+            sfx.swipe();
+        }
+    }
+    function moveRight() {
+        if (gameState !== 'PLAYING') return;
+        if (currentLane < 2) {
+            currentLane++;
+            sfx.swipe();
+        }
+    }
+    function jumpAction() {
+        if (gameState !== 'PLAYING') return;
+        if (!isJumping && powerTimers.jetpack <= 0) {
+            isJumping = true;
+            isRolling = false;
+            velocityY = 15.5;
+            sfx.jump();
+        }
+    }
+    function rollAction() {
+        if (gameState !== 'PLAYING') return;
+        if (powerTimers.jetpack > 0) return;
+        isRolling = true;
+        rollTimer = 0.65;
+        if (isJumping) {
+            velocityY = -24;
+        }
+        sfx.roll();
+    }
+
+    let touchStartX = 0;
+    let touchStartY = 0;
+    window.addEventListener('touchstart', e => {
+        if (e.touches.length > 0) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }
+    }, { passive: true });
+
+    window.addEventListener('touchend', e => {
+        if (gameState !== 'PLAYING' || e.changedTouches.length === 0) return;
+        const dx = e.changedTouches[0].clientX - touchStartX;
+        const dy = e.changedTouches[0].clientY - touchStartY;
+        const absX = Math.abs(dx);
+        const absY = Math.abs(dy);
+
+        if (Math.max(absX, absY) < 24) return;
+
+        if (absX > absY) {
+            if (dx > 0) moveRight();
+            else moveLeft();
+        } else {
+            if (dy < 0) jumpAction();
+            else rollAction();
+        }
+    }, { passive: true });
+
+    window.addEventListener('keydown', e => {
+        if (gameState !== 'PLAYING') return;
+        switch (e.key) {
+            case 'ArrowLeft': case 'a': case 'A': moveLeft(); break;
+            case 'ArrowRight': case 'd': case 'D': moveRight(); break;
+            case 'ArrowUp': case 'w': case 'W': case ' ': jumpAction(); break;
+            case 'ArrowDown': case 's': case 'S': rollAction(); break;
+        }
+    });
+
+    document.getElementById('ctrl-left').addEventListener('click', moveLeft);
+    document.getElementById('ctrl-right').addEventListener('click', moveRight);
+    document.getElementById('ctrl-up').addEventListener('click', jumpAction);
+    document.getElementById('ctrl-down').addEventListener('click', rollAction);
+
+    /**
+     * ============================================================================
+     * 8. MENU & MODAL RENDERERS (500 LEVELS, SHOP, STATS, LEADERBOARD)
+     * ============================================================================
+     */
+    function hideAllOverlays() {
+        ['menu-main', 'hud', 'modal-levels', 'modal-shop', 'modal-stats', 'modal-leaderboard', 'modal-endgame', 'modal-pause']
+            .forEach(id => document.getElementById(id).classList.add('hidden'));
+    }
+
+    function returnToMainMenu() {
+        gameState = 'MENU';
+        hideAllOverlays();
+        applyEnvironmentTheme('day');
+        clearEntities();
+        buildPlayerMesh();
+        updateMenuUI();
+        document.getElementById('menu-main').classList.remove('hidden');
+    }
+
+    function updateMenuUI() {
+        document.getElementById('menu-total-coins').textContent = saveData.coins;
+        document.getElementById('menu-high-score').textContent = saveData.highScore;
+        document.getElementById('selected-level-num').textContent = saveData.selectedLevel;
+    }
+
+    let currentLevelFilter = 'all';
+    function filterLevelTier(tier) {
+        currentLevelFilter = tier;
+        renderLevelsModal();
+    }
+
+    function renderLevelsModal() {
+        const container = document.getElementById('levels-container');
+        container.innerHTML = '';
+
+        let filtered = LEVEL_CONFIGS;
+        if (currentLevelFilter === 'Beginner') filtered = LEVEL_CONFIGS.filter(l => l.id <= 100);
+        else if (currentLevelFilter === 'Intermediate') filtered = LEVEL_CONFIGS.filter(l => l.id > 100 && l.id <= 200);
+        else if (currentLevelFilter === 'Advanced') filtered = LEVEL_CONFIGS.filter(l => l.id > 200 && l.id <= 350);
+        else if (currentLevelFilter === 'Master') filtered = LEVEL_CONFIGS.filter(l => l.id > 350);
+
+        const grid = document.createElement('div');
+        grid.className = 'grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3';
+
+        filtered.forEach(lv => {
+            const isUnlocked = lv.id <= saveData.unlockedLevel;
+            const card = document.createElement('button');
+            card.disabled = !isUnlocked;
+            card.className = `btn-arcade text-left p-3.5 rounded-2xl border transition flex flex-col justify-between ${
+                isUnlocked
+                    ? 'bg-slate-800 hover:bg-slate-700 border-white/15 text-white cursor-pointer'
+                    : 'bg-slate-900/60 border-white/5 text-slate-500 cursor-not-allowed opacity-70'
+            }`;
+
+            card.innerHTML = `
+                <div class="flex items-center justify-between mb-1">
+                    <span class="font-arcade text-base font-bold ${isUnlocked ? 'text-amber-400' : 'text-slate-500'}">LEVEL ${lv.id}</span>
+                    <span class="text-sm">${isUnlocked ? '▶️' : '🔒'}</span>
+                </div>
+                <div class="font-bold text-xs leading-snug truncate">${lv.title}</div>
+                <div class="text-[11px] text-slate-400 mt-1">Target Skor: ${lv.target}</div>
+            `;
+
+            if (isUnlocked) {
+                card.onclick = () => startLevel(lv.id);
+            }
+            grid.appendChild(card);
+        });
+
+        container.appendChild(grid);
+    }
+
+    function renderShopModal() {
+        document.getElementById('shop-coins').textContent = saveData.coins;
+        const container = document.getElementById('shop-container');
+        container.innerHTML = '';
+
+        CHARACTERS.forEach(ch => {
+            const owned = saveData.ownedChars.includes(ch.id);
+            const equipped = saveData.equippedChar === ch.id;
+            const hexColor = '#' + ch.shirt.toString(16).padStart(6, '0');
+
+            const card = document.createElement('div');
+            card.className = `p-4 rounded-2xl border ${equipped ? 'bg-indigo-950/70 border-amber-400' : 'bg-slate-800/80 border-white/10'} flex flex-col justify-between gap-3`;
+
+            card.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-2xl shadow-inner border border-white/20" style="background:${hexColor}">
+                        🏃
+                    </div>
+                    <div>
+                        <div class="font-arcade text-lg font-bold text-white">${ch.name}</div>
+                        <div class="text-xs text-slate-300">${ch.desc}</div>
+                    </div>
+                </div>
+            `;
+
+            const btn = document.createElement('button');
+            if (equipped) {
+                btn.className = 'w-full py-2.5 rounded-xl bg-emerald-500/20 border border-emerald-400 text-emerald-300 font-bold text-xs';
+                btn.textContent = '✅ SEDANG DIPAKAI';
+            } else if (owned) {
+                btn.className = 'btn-arcade w-full py-2.5 rounded-xl bg-sky-500 text-slate-950 font-extrabold text-xs';
+                btn.textContent = 'PAKAI KARAKTER';
+                btn.onclick = () => {
+                    saveData.equippedChar = ch.id;
+                    persistSave();
+                    buildPlayerMesh();
+                    renderShopModal();
+                };
+            } else {
+                const canAfford = saveData.coins >= ch.price;
+                btn.className = `btn-arcade w-full py-2.5 rounded-xl font-extrabold text-xs ${canAfford ? 'bg-amber-400 text-slate-950' : 'bg-slate-700 text-slate-400'}`;
+                btn.textContent = `🪙 BELI (${ch.price} KOIN)`;
+                btn.onclick = () => {
+                    if (saveData.coins >= ch.price) {
+                        saveData.coins -= ch.price;
+                        saveData.ownedChars.push(ch.id);
+                        saveData.equippedChar = ch.id;
+                        sfx.powerup();
+                        persistSave();
+                        buildPlayerMesh();
+                        renderShopModal();
+                    }
+                };
+            }
+
+            card.appendChild(btn);
+            container.appendChild(card);
+        });
+    }
+
+    function renderStatsModal() {
+        const container = document.getElementById('stats-container');
+        const total = saveData.stats.totalCorrect + saveData.stats.totalWrong;
+        const accuracy = total > 0 ? Math.round((saveData.stats.totalCorrect / total) * 100) : 0;
+
+        const mastered = [];
+        const needsWork = [];
+
+        Object.entries(saveData.stats.byTopic).forEach(([topic, data]) => {
+            const tSum = data.correct + data.wrong;
+            if (tSum > 0) {
+                const acc = Math.round((data.correct / tSum) * 100);
+                if (acc >= 75) mastered.push(`${topic} (${acc}%)`);
+                else needsWork.push(`${topic} (${acc}%)`);
+            }
+        });
+
+        container.innerHTML = `
+            <div class="grid grid-cols-3 gap-3 text-center">
+                <div class="bg-slate-800 border border-white/10 p-3.5 rounded-2xl">
+                    <div class="text-xs text-slate-400">Jawaban Benar</div>
+                    <div class="font-arcade text-2xl font-bold text-emerald-400 mt-1">${saveData.stats.totalCorrect}</div>
+                </div>
+                <div class="bg-slate-800 border border-white/10 p-3.5 rounded-2xl">
+                    <div class="text-xs text-slate-400">Jawaban Salah</div>
+                    <div class="font-arcade text-2xl font-bold text-rose-400 mt-1">${saveData.stats.totalWrong}</div>
+                </div>
+                <div class="bg-slate-800 border border-white/10 p-3.5 rounded-2xl">
+                    <div class="text-xs text-slate-400">Akurasi Total</div>
+                    <div class="font-arcade text-2xl font-bold text-amber-400 mt-1">${accuracy}%</div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div class="bg-emerald-950/40 border border-emerald-500/30 p-4 rounded-2xl">
+                    <h4 class="font-bold text-sm text-emerald-300 mb-2">🌟 Materi Sudah Dikuasai</h4>
+                    <p class="text-xs text-slate-200 leading-relaxed">
+                        ${mastered.length > 0 ? mastered.join(', ') : 'Belum ada data cukup. Ayo mainkan lebih banyak soal!'}
+                    </p>
+                </div>
+                <div class="bg-rose-950/40 border border-rose-500/30 p-4 rounded-2xl">
+                    <h4 class="font-bold text-sm text-rose-300 mb-2">📚 Perlu Dipelajari Kembali</h4>
+                    <p class="text-xs text-slate-200 leading-relaxed">
+                        ${needsWork.length > 0 ? needsWork.join(', ') : 'Hebat! Belum ada materi yang tertinggal.'}
+                    </p>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderLeaderboardModal() {
+        const container = document.getElementById('leaderboard-container');
+        const entries = [
+            { name: 'Raka_Grandmaster', score: 18400, lv: 485 },
+            { name: 'NadiaKalkulus', score: 14200, lv: 410 },
+            { name: 'Kamu (Pemain)', score: saveData.highScore, lv: saveData.unlockedLevel, isPlayer: true },
+            { name: 'DimasRunner', score: 6850, lv: 215 },
+            { name: 'PutriCerdas', score: 3200, lv: 120 },
+            { name: 'Arief_Pemula', score: 850, lv: 35 }
+        ].sort((a, b) => b.score - a.score);
+
+        container.innerHTML = entries.map((e, idx) => {
+            const medal = idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `#${idx + 1}`;
+            return `
+                <div class="flex items-center justify-between p-3.5 rounded-2xl border ${e.isPlayer ? 'bg-indigo-900/70 border-amber-400' : 'bg-slate-800/70 border-white/10'}">
+                    <div class="flex items-center gap-3">
+                        <span class="font-arcade text-lg w-8 text-center text-amber-300">${medal}</span>
+                        <div>
+                            <div class="font-bold text-sm text-white">${e.name}</div>
+                            <div class="text-[11px] text-slate-400">Level Tertinggi: ${e.lv}</div>
+                        </div>
+                    </div>
+                    <div class="font-arcade text-lg font-bold text-amber-400">${e.score}</div>
+                </div>
+            `;
+        }).join('');
+    }
+
+    /**
+     * ============================================================================
+     * 9. WIRE UP UI NAVIGATION EVENTS & BOOTSTRAP
+     * ============================================================================
+     */
+    document.getElementById('btn-play-now').addEventListener('click', () => startLevel(saveData.selectedLevel));
+
+    document.getElementById('nav-levels').addEventListener('click', () => {
+        renderLevelsModal();
+        document.getElementById('modal-levels').classList.remove('hidden');
+    });
+
+    document.getElementById('nav-shop').addEventListener('click', () => {
+        renderShopModal();
+        document.getElementById('modal-shop').classList.remove('hidden');
+    });
+
+    document.getElementById('nav-stats').addEventListener('click', () => {
+        renderStatsModal();
+        document.getElementById('modal-stats').classList.add('hidden'); // Fixed toggle fix
+        document.getElementById('modal-stats').classList.remove('hidden');
+    });
+
+    document.getElementById('nav-leaderboard').addEventListener('click', () => {
+        renderLeaderboardModal();
+        document.getElementById('modal-leaderboard').classList.remove('hidden');
+    });
+
+    document.querySelectorAll('.close-modal').forEach(btn => {
+        btn.addEventListener('click', () => {
+            btn.closest('.ui-layer').classList.add('hidden');
+        });
+    });
+
+    document.getElementById('btn-sound-toggle').addEventListener('click', e => {
+        sfx.enabled = !sfx.enabled;
+        e.currentTarget.textContent = sfx.enabled ? '🔊' : '🔇';
+        if (sfx.enabled) sfx.coin();
+    });
+
+    document.getElementById('btn-pause').addEventListener('click', () => {
+        if (gameState === 'PLAYING') {
+            gameState = 'PAUSED';
+            document.getElementById('modal-pause').classList.remove('hidden');
+        }
+    });
+    document.getElementById('btn-resume').addEventListener('click', () => {
+        document.getElementById('modal-pause').classList.add('hidden');
+        lastTime = performance.now();
+        gameState = 'PLAYING';
+    });
+    document.getElementById('btn-pause-restart').addEventListener('click', () => startLevel(currentLevelCfg.id));
+    document.getElementById('btn-pause-home').addEventListener('click', returnToMainMenu);
+
+    document.getElementById('btn-end-retry').addEventListener('click', () => startLevel(currentLevelCfg.id));
+    document.getElementById('btn-end-home').addEventListener('click', returnToMainMenu);
+
+    window.onload = function () {
+        initThree();
+        updateMenuUI();
+        lastTime = performance.now();
+        animate(lastTime);
+    };
+    </script>
+</body>
+</html>
